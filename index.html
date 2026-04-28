@@ -1,0 +1,173 @@
+typ.remove();
+addMsg('x3', reply);
+setState('speaking', 'Sintetizando voz...');
+await speak(reply);
+} catch (err) {
+typ.remove();
+addMsg('error', ${err.message});
+console.error('[X3]', err);
+} finally { setState('idle', 'Sistema en línea. Listo para recibir comandos.'); }
+}
+
+/* ── TTS ── */    
+    const TTS = 'speechSynthesis' in window ? speechSynthesis : null;    
+    let ttsOK = false,    
+        bestVoice = null;    
+
+    function loadVoices() {    
+        if (!TTS) return;    
+        const vv = TTS.getVoices(); if (!vv.length) return;    
+        ttsOK = true;    
+        bestVoice = vv.find(v => v.lang === 'es-CL' && v.localService) || vv.find(v => v.lang.startsWith('es') && v    
+            .localService) || vv.find(v => v.lang.startsWith('es-')) || vv.find(v => v.lang.startsWith('es')) || null;    
+        const el = $('stat-tts');    
+        el.textContent = ttsOK ? 'SÍ' : 'NO';    
+        el.className = 'stat-num ' + (ttsOK ? 'ok' : 'err');    
+    }    
+    if (TTS) { if ('onvoiceschanged' in TTS) TTS.onvoiceschanged = loadVoices;    
+        loadVoices(); }    
+
+    function splitTTS(text, maxWords = 160) {    
+        const sents = text.split(/(?<=[.!?:])\s+/);    
+        const chunks = [];    
+        let cur = '';    
+        sents.forEach(s => {    
+            const wc = (cur + ' ' + s).trim().split(/\s+/).length;    
+            if (wc > maxWords && cur) { chunks.push(cur.trim());    
+                cur = s; } else { cur = cur ? cur + ' ' + s : s; }    
+        });    
+        if (cur.trim()) chunks.push(cur.trim());    
+        return chunks.length ? chunks : [text];    
+    }    
+
+    function speak(text) {    
+        return new Promise(res => {    
+            if (!TTS || !ttsOK) { res(); return; }    
+            try { TTS.cancel(); } catch {}    
+            const clean = text.replace(/[\u{1F000}-\u{1FFFF}]/gu, '').replace(/[◎●◌▶◆▸•\/\\]/g, '').replace(    
+                /\s{2,}/g, ' ').trim();    
+            if (!clean || clean.length < 2) { res(); return; }    
+            const chunks = splitTTS(clean);    
+            let i = 0;    
+            let done = false;    
+            const guard = setTimeout(() => { if (!done) { done = true;    
+                    res(); } }, Math.max(chunks.length * 13000, 8000));    
+            function next() {    
+                if (i >= chunks.length) { if (!done) { done = true;    
+                        clearTimeout(guard);    
+                        res(); } return; }    
+                try {    
+                    const u = new SpeechSynthesisUtterance(chunks[i++]);    
+                    u.lang = 'es-CL';    
+                    u.rate = 0.91;    
+                    u.pitch = 0.84;    
+                    u.volume = 1;    
+                    if (bestVoice) u.voice = bestVoice;    
+                    u.onend = next;    
+                    u.onerror = e => { if (e.error !== 'interrupted') console.warn('[TTS]', e.error);    
+                        next(); };    
+                    TTS.speak(u);    
+                } catch { if (!done) { done = true;    
+                        clearTimeout(guard);    
+                        res(); } }    
+            }    
+            next();    
+        });    
+    }    
+
+    /* ── STT ── */    
+    const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;    
+    let sr = null;    
+
+    if (SRClass) {    
+        sr = new SRClass();    
+        sr.lang = 'es-CL';    
+        sr.continuous = false;    
+        sr.interimResults = false;    
+        sr.maxAlternatives = 1;    
+
+        sr.onstart = () => { srBusy = true;    
+            setState('listening', 'Escuchando... Hable ahora.'); };    
+        sr.onresult = async e => { const t = (e.results[0]?.[0]?.transcript || '').trim(); if (t) await processInput(    
+                t); };    
+        sr.onerror = e => { srBusy = false; if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {    
+            setState('idle', 'Permiso de micrófono denegado.');    
+            addSys('— Active el permiso de micrófono en ajustes del navegador. —'); } else if (e.error ===    
+            'no-speech') { setState('idle',    
+            'Sin voz detectada. Intente de nuevo.'); } else if (e.error !== 'aborted') { setState('idle',    
+                `Error de micrófono: ${e.error}`); } };    
+        sr.onend = () => { srBusy = false; if (S === 'listening') setState('idle', 'Sin entrada de voz.'); };    
+        const el = $('stat-sr');    
+        el.textContent = 'SÍ';    
+        el.className = 'stat-num ok';    
+    } else { const el = $('stat-sr');    
+        el.textContent = 'NO';    
+        el.className = 'stat-num err'; }    
+
+    micBtn.addEventListener('click', () => {    
+        if (S === 'thinking') return;    
+        if (!sr) { addSys('— Reconocimiento de voz no disponible. Use Chrome o Edge. —'); return; }    
+        if (S === 'listening') { try { sr.stop(); } catch {} setState('idle', 'Escucha cancelada.'); } else {    
+            if (srBusy) return;    
+            try { sr.start(); } catch (e) { srBusy = false; if (e.name === 'InvalidStateError') { try { sr    
+                        .stop(); } catch {} setTimeout(() => { try { sr.start(); } catch {} },    
+                    350); } }    
+        }    
+    });    
+
+    /* ── TEXT INPUT ── */    
+    function submitText() { const v = txtIn.value.trim(); if (!v || S === 'thinking') return;    
+        txtIn.value = '';    
+        txtIn.focus();    
+        processInput(v); }    
+    txtIn.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault();    
+            submitText(); } });    
+
+    /* ── HELP & EXPORT ── */    
+    function showHelp() { addMsg('x3', 'Guía rápida de X3:\n\n• Pregunte cualquier cosa.\n• Guarde datos — "Recuerda que soy médico".\n• Cree proyectos — "Crea el proyecto Atlas".\n• Consulte memoria — "¿Qué recuerdas de mí?".\n• Orbe → activar micrófono (Chrome/Edge).\n• Campo de texto → cualquier navegador.\n• Motor: Gemini 2.0 Flash.'); }    
+
+    function exportMemory() { const m = mLoad(); const blob = new Blob([JSON.stringify({ exportDate: new Date()    
+                .toISOString(), ...m }, null, 2)], { type: 'application/json' }); const a = document    
+            .createElement('a');    
+        a.href = URL.createObjectURL(blob);    
+        a.download = `x3_memoria_${new Date().toISOString().split('T')[0]}.json`;    
+        document.body.appendChild(a);    
+        a.click();    
+        setTimeout(() => { URL.revokeObjectURL(a.href);    
+            a.remove(); }, 1000); }    
+
+    /* ── BOOT ── */    
+    async function boot() { const seq = [    
+            [380, 'Inicializando núcleo X3...'],    
+            [340, 'Conectando con Gemini 2.0 Flash...'],    
+            [300, 'Cargando bóveda de memoria...'],    
+            [260, 'Calibrando motor de voz...'],    
+            [220, 'Verificando sistemas...'],    
+        ]; for (const [ms, msg] of seq) { setState('thinking', msg); await new Promise(r => setTimeout(r,    
+            ms)); }    
+        const m = mLoad();    
+        renderSidebar(m);    
+        setState('idle', 'Sistema en línea. Listo para recibir comandos.'); const nc = Object.keys(m.ctx || {})    
+            .length,    
+            np = (m.projects || []).length;    
+        let greet; if (nc > 0 || np > 0) { const parts = []; if (nc > 0) parts.push(    
+            `${nc} entrada${nc!==1?'s':''} en memoria`); if (np > 0) parts.push(    
+                `${np} proyecto${np!==1?'s':''} activo${np!==1?'s':''}`); greet =    
+            `Sistemas en línea. Tengo ${parts.join(' y ')}. Motor Gemini operativo. A sus órdenes, señor.`; } else { greet =    
+            `Sistemas en línea. Motor Gemini 2.0 Flash operativo. Primera sesión detectada. Bienvenido, señor Alexander. Puede hablar o escribir.`; }    
+        addMsg('x3', greet);    
+        await speak(greet); }    
+
+    boot().catch(e => { console.error('[X3 Boot]', e);    
+        setState('idle', 'Sistema iniciado con advertencias.'); });    
+
+    /* ── CLEANUP AL CERRAR ── */    
+    window.addEventListener('beforeunload', () => {    
+        clearInterval(clockInterval);    
+        if (sr && srBusy) { try { sr.abort(); } catch {} }    
+        if (TTS) { try { TTS.cancel(); } catch {} }    
+    });    
+</script>
+
+</body>    
+</htm
