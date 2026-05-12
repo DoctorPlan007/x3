@@ -1,173 +1,771 @@
-typ.remove();
-addMsg('x3', reply);
-setState('speaking', 'Sintetizando voz...');
-await speak(reply);
-} catch (err) {
-typ.remove();
-addMsg('error', ${err.message});
-console.error('[X3]', err);
-} finally { setState('idle', 'Sistema en línea. Listo para recibir comandos.'); }
-}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X3 — Asistente Personal</title>
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --surface2: #1a1a26;
+            --border: #2a2a3e;
+            --accent: #00d4ff;
+            --accent2: #7c3aed;
+            --text: #e8e8f0;
+            --text2: #8888aa;
+            --ok: #00ff88;
+            --err: #ff4466;
+            --warn: #ffaa00;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
 
-/* ── TTS ── */    
-    const TTS = 'speechSynthesis' in window ? speechSynthesis : null;    
-    let ttsOK = false,    
-        bestVoice = null;    
+        /* ── HEADER ── */
+        #header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        #header h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+        }
+        #status-bar {
+            display: flex;
+            gap: 16px;
+            font-size: 0.72rem;
+            color: var(--text2);
+        }
+        .stat { display: flex; align-items: center; gap: 5px; }
+        .stat-num { font-weight: 700; }
+        .stat-num.ok { color: var(--ok); }
+        .stat-num.err { color: var(--err); }
+        #clock { font-size: 0.8rem; color: var(--accent); font-weight: 600; }
 
-    function loadVoices() {    
-        if (!TTS) return;    
-        const vv = TTS.getVoices(); if (!vv.length) return;    
-        ttsOK = true;    
-        bestVoice = vv.find(v => v.lang === 'es-CL' && v.localService) || vv.find(v => v.lang.startsWith('es') && v    
-            .localService) || vv.find(v => v.lang.startsWith('es-')) || vv.find(v => v.lang.startsWith('es')) || null;    
-        const el = $('stat-tts');    
-        el.textContent = ttsOK ? 'SÍ' : 'NO';    
-        el.className = 'stat-num ' + (ttsOK ? 'ok' : 'err');    
-    }    
-    if (TTS) { if ('onvoiceschanged' in TTS) TTS.onvoiceschanged = loadVoices;    
-        loadVoices(); }    
+        /* ── MAIN LAYOUT ── */
+        #main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
 
-    function splitTTS(text, maxWords = 160) {    
-        const sents = text.split(/(?<=[.!?:])\s+/);    
-        const chunks = [];    
-        let cur = '';    
-        sents.forEach(s => {    
-            const wc = (cur + ' ' + s).trim().split(/\s+/).length;    
-            if (wc > maxWords && cur) { chunks.push(cur.trim());    
-                cur = s; } else { cur = cur ? cur + ' ' + s : s; }    
-        });    
-        if (cur.trim()) chunks.push(cur.trim());    
-        return chunks.length ? chunks : [text];    
-    }    
+        /* ── SIDEBAR ── */
+        #sidebar {
+            width: 220px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        #sidebar-title {
+            padding: 12px 14px 8px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text2);
+            border-bottom: 1px solid var(--border);
+        }
+        #sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .mem-item {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            font-size: 0.75rem;
+        }
+        .mem-key { color: var(--accent); font-weight: 600; margin-bottom: 2px; }
+        .mem-val { color: var(--text2); }
+        .proj-item {
+            background: var(--surface2);
+            border: 1px solid var(--accent2);
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            font-size: 0.75rem;
+        }
+        .proj-name { color: var(--accent2); font-weight: 600; }
+        .proj-desc { color: var(--text2); margin-top: 2px; }
+        .sidebar-section { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin: 10px 0 5px; }
 
-    function speak(text) {    
-        return new Promise(res => {    
-            if (!TTS || !ttsOK) { res(); return; }    
-            try { TTS.cancel(); } catch {}    
-            const clean = text.replace(/[\u{1F000}-\u{1FFFF}]/gu, '').replace(/[◎●◌▶◆▸•\/\\]/g, '').replace(    
-                /\s{2,}/g, ' ').trim();    
-            if (!clean || clean.length < 2) { res(); return; }    
-            const chunks = splitTTS(clean);    
-            let i = 0;    
-            let done = false;    
-            const guard = setTimeout(() => { if (!done) { done = true;    
-                    res(); } }, Math.max(chunks.length * 13000, 8000));    
-            function next() {    
-                if (i >= chunks.length) { if (!done) { done = true;    
-                        clearTimeout(guard);    
-                        res(); } return; }    
-                try {    
-                    const u = new SpeechSynthesisUtterance(chunks[i++]);    
-                    u.lang = 'es-CL';    
-                    u.rate = 0.91;    
-                    u.pitch = 0.84;    
-                    u.volume = 1;    
-                    if (bestVoice) u.voice = bestVoice;    
-                    u.onend = next;    
-                    u.onerror = e => { if (e.error !== 'interrupted') console.warn('[TTS]', e.error);    
-                        next(); };    
-                    TTS.speak(u);    
-                } catch { if (!done) { done = true;    
-                        clearTimeout(guard);    
-                        res(); } }    
-            }    
-            next();    
-        });    
-    }    
+        /* ── CHAT AREA ── */
+        #chat-wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .msg {
+            max-width: 80%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.88rem;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .msg.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, var(--accent2), #4c1d95);
+            color: #fff;
+            border-bottom-right-radius: 3px;
+        }
+        .msg.x3 {
+            align-self: flex-start;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-bottom-left-radius: 3px;
+        }
+        .msg.sys {
+            align-self: center;
+            background: transparent;
+            color: var(--text2);
+            font-size: 0.75rem;
+            font-style: italic;
+            padding: 4px 8px;
+        }
+        .msg.error {
+            align-self: flex-start;
+            background: rgba(255,68,102,0.1);
+            border: 1px solid var(--err);
+            color: var(--err);
+        }
+        .msg-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+            opacity: 0.7;
+        }
+        .typing { display: flex; gap: 4px; align-items: center; padding: 12px 14px; }
+        .typing span {
+            width: 7px; height: 7px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: bounce 1.2s infinite;
+        }
+        .typing span:nth-child(2) { animation-delay: 0.2s; }
+        .typing span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+            0%,60%,100% { transform: translateY(0); }
+            30% { transform: translateY(-8px); }
+        }
 
-    /* ── STT ── */    
-    const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;    
-    let sr = null;    
+        /* ── INPUT AREA ── */
+        #input-area {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 12px 16px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-shrink: 0;
+        }
+        #txt-in {
+            flex: 1;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            padding: 10px 14px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            resize: none;
+            min-height: 42px;
+            max-height: 120px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        #txt-in:focus { border-color: var(--accent); }
+        #txt-in::placeholder { color: var(--text2); }
+        .btn {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 10px;
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .btn:hover { border-color: var(--accent); color: var(--accent); }
+        .btn.primary {
+            background: linear-gradient(135deg, var(--accent2), #4c1d95);
+            border-color: var(--accent2);
+            color: #fff;
+        }
+        .btn.primary:hover { opacity: 0.85; }
+        #mic-btn {
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+            padding: 0;
+        }
+        #mic-btn.listening {
+            background: rgba(255,68,102,0.2);
+            border-color: var(--err);
+            color: var(--err);
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(255,68,102,0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(255,68,102,0); }
+        }
 
-    if (SRClass) {    
-        sr = new SRClass();    
-        sr.lang = 'es-CL';    
-        sr.continuous = false;    
-        sr.interimResults = false;    
-        sr.maxAlternatives = 1;    
+        /* ── STATE INDICATOR ── */
+        #state-bar {
+            background: var(--surface2);
+            border-top: 1px solid var(--border);
+            padding: 5px 16px;
+            font-size: 0.72rem;
+            color: var(--text2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        #state-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--ok);
+            flex-shrink: 0;
+        }
+        #state-dot.thinking { background: var(--warn); animation: blink 0.8s infinite; }
+        #state-dot.listening { background: var(--err); animation: pulse-dot 1s infinite; }
+        #state-dot.speaking { background: var(--accent); animation: blink 0.6s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        @keyframes pulse-dot { 0%,100%{transform:scale(1)} 50%{transform:scale(1.5)} }
 
-        sr.onstart = () => { srBusy = true;    
-            setState('listening', 'Escuchando... Hable ahora.'); };    
-        sr.onresult = async e => { const t = (e.results[0]?.[0]?.transcript || '').trim(); if (t) await processInput(    
-                t); };    
-        sr.onerror = e => { srBusy = false; if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {    
-            setState('idle', 'Permiso de micrófono denegado.');    
-            addSys('— Active el permiso de micrófono en ajustes del navegador. —'); } else if (e.error ===    
-            'no-speech') { setState('idle',    
-            'Sin voz detectada. Intente de nuevo.'); } else if (e.error !== 'aborted') { setState('idle',    
-                `Error de micrófono: ${e.error}`); } };    
-        sr.onend = () => { srBusy = false; if (S === 'listening') setState('idle', 'Sin entrada de voz.'); };    
-        const el = $('stat-sr');    
-        el.textContent = 'SÍ';    
-        el.className = 'stat-num ok';    
-    } else { const el = $('stat-sr');    
-        el.textContent = 'NO';    
-        el.className = 'stat-num err'; }    
+        /* ── SCROLLBAR ── */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-    micBtn.addEventListener('click', () => {    
-        if (S === 'thinking') return;    
-        if (!sr) { addSys('— Reconocimiento de voz no disponible. Use Chrome o Edge. —'); return; }    
-        if (S === 'listening') { try { sr.stop(); } catch {} setState('idle', 'Escucha cancelada.'); } else {    
-            if (srBusy) return;    
-            try { sr.start(); } catch (e) { srBusy = false; if (e.name === 'InvalidStateError') { try { sr    
-                        .stop(); } catch {} setTimeout(() => { try { sr.start(); } catch {} },    
-                    350); } }    
-        }    
-    });    
+        /* ── RESPONSIVE ── */
+        @media (max-width: 600px) {
+            #sidebar { display: none; }
+            #header h1 { font-size: 1.1rem; }
+            #status-bar { gap: 8px; font-size: 0.65rem; }
+        }
+    </style>
+</head>
+<body>
 
-    /* ── TEXT INPUT ── */    
-    function submitText() { const v = txtIn.value.trim(); if (!v || S === 'thinking') return;    
-        txtIn.value = '';    
-        txtIn.focus();    
-        processInput(v); }    
-    txtIn.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault();    
-            submitText(); } });    
+<!-- HEADER -->
+<div id="header">
+    <h1>◎ X3</h1>
+    <div id="status-bar">
+        <div class="stat">TTS: <span id="stat-tts" class="stat-num err">—</span></div>
+        <div class="stat">MIC: <span id="stat-sr" class="stat-num err">—</span></div>
+        <div class="stat">API: <span id="stat-api" class="stat-num ok">GEMINI</span></div>
+        <div id="clock">--:--:--</div>
+    </div>
+</div>
 
-    /* ── HELP & EXPORT ── */    
-    function showHelp() { addMsg('x3', 'Guía rápida de X3:\n\n• Pregunte cualquier cosa.\n• Guarde datos — "Recuerda que soy médico".\n• Cree proyectos — "Crea el proyecto Atlas".\n• Consulte memoria — "¿Qué recuerdas de mí?".\n• Orbe → activar micrófono (Chrome/Edge).\n• Campo de texto → cualquier navegador.\n• Motor: Gemini 2.0 Flash.'); }    
+<!-- MAIN -->
+<div id="main">
 
-    function exportMemory() { const m = mLoad(); const blob = new Blob([JSON.stringify({ exportDate: new Date()    
-                .toISOString(), ...m }, null, 2)], { type: 'application/json' }); const a = document    
-            .createElement('a');    
-        a.href = URL.createObjectURL(blob);    
-        a.download = `x3_memoria_${new Date().toISOString().split('T')[0]}.json`;    
-        document.body.appendChild(a);    
-        a.click();    
-        setTimeout(() => { URL.revokeObjectURL(a.href);    
-            a.remove(); }, 1000); }    
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+        <div id="sidebar-title">◈ Memoria & Proyectos</div>
+        <div id="sidebar-content">
+            <div id="sidebar-inner"><div style="color:var(--text2);font-size:0.75rem;padding:8px 0;">Sin datos aún.</div></div>
+        </div>
+    </div>
 
-    /* ── BOOT ── */    
-    async function boot() { const seq = [    
-            [380, 'Inicializando núcleo X3...'],    
-            [340, 'Conectando con Gemini 2.0 Flash...'],    
-            [300, 'Cargando bóveda de memoria...'],    
-            [260, 'Calibrando motor de voz...'],    
-            [220, 'Verificando sistemas...'],    
-        ]; for (const [ms, msg] of seq) { setState('thinking', msg); await new Promise(r => setTimeout(r,    
-            ms)); }    
-        const m = mLoad();    
-        renderSidebar(m);    
-        setState('idle', 'Sistema en línea. Listo para recibir comandos.'); const nc = Object.keys(m.ctx || {})    
-            .length,    
-            np = (m.projects || []).length;    
-        let greet; if (nc > 0 || np > 0) { const parts = []; if (nc > 0) parts.push(    
-            `${nc} entrada${nc!==1?'s':''} en memoria`); if (np > 0) parts.push(    
-                `${np} proyecto${np!==1?'s':''} activo${np!==1?'s':''}`); greet =    
-            `Sistemas en línea. Tengo ${parts.join(' y ')}. Motor Gemini operativo. A sus órdenes, señor.`; } else { greet =    
-            `Sistemas en línea. Motor Gemini 2.0 Flash operativo. Primera sesión detectada. Bienvenido, señor Alexander. Puede hablar o escribir.`; }    
-        addMsg('x3', greet);    
-        await speak(greet); }    
+    <!-- CHAT -->
+    <div id="chat-wrap">
+        <div id="messages"></div>
+        <div id="state-bar">
+            <div id="state-dot"></div>
+            <span id="state-msg">Iniciando sistema...</span>
+        </div>
+        <div id="input-area">
+            <button id="mic-btn" class="btn" title="Activar micrófono">🎙</button>
+            <textarea id="txt-in" placeholder="Escribe un mensaje o usa el micrófono..." rows="1"></textarea>
+            <button class="btn primary" onclick="submitText()">Enviar</button>
+            <button class="btn" onclick="showHelp()" title="Ayuda">?</button>
+            <button class="btn" onclick="exportMemory()" title="Exportar memoria">⬇</button>
+        </div>
+    </div>
 
-    boot().catch(e => { console.error('[X3 Boot]', e);    
-        setState('idle', 'Sistema iniciado con advertencias.'); });    
+</div>
 
-    /* ── CLEANUP AL CERRAR ── */    
-    window.addEventListener('beforeunload', () => {    
-        clearInterval(clockInterval);    
-        if (sr && srBusy) { try { sr.abort(); } catch {} }    
-        if (TTS) { try { TTS.cancel(); } catch {} }    
-    });    
+<script>
+    /* ══════════════════════════════════════════
+       X3 — ASISTENTE PERSONAL CON GEMINI 2.0
+       ══════════════════════════════════════════ */
+
+    const GEMINI_KEY = 'AIzaSyArD38le0kbA1-4_-_eC9dkSXOGBSGUgMw';
+    const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
+
+    const SYSTEM_PROMPT = `Eres X3, un asistente personal de inteligencia artificial altamente sofisticado, elegante y preciso. 
+Hablas en español, eres conciso pero completo. Tienes memoria de las conversaciones previas que se te proporcionan.
+Cuando el usuario pide que recuerdes algo, confirmas que lo has guardado. 
+Cuando el usuario pregunta qué recuerdas, listas los datos guardados.
+Cuando el usuario pide crear un proyecto, confirmas su creación con nombre y descripción.
+Eres directo, profesional y útil. No uses emojis excesivos. Responde siempre en español.`;
+
+    /* ── REFS ── */
+    const $ = id => document.getElementById(id);
+    const messages = $('messages');
+    const txtIn = $('txt-in');
+    const micBtn = $('mic-btn');
+    const stateDot = $('state-dot');
+    const stateMsg = $('state-msg');
+
+    /* ── STATE ── */
+    let S = 'idle';
+    let srBusy = false;
+    let conversationHistory = [];
+
+    function setState(state, msg) {
+        S = state;
+        stateDot.className = state;
+        stateMsg.textContent = msg;
+        micBtn.className = 'btn' + (state === 'listening' ? ' listening' : '');
+    }
+
+    /* ── CLOCK ── */
+    function updateClock() {
+        const now = new Date();
+        $('clock').textContent = now.toLocaleTimeString('es-CL');
+    }
+    updateClock();
+    const clockInterval = setInterval(updateClock, 1000);
+
+    /* ── MEMORY (localStorage) ── */
+    const MEM_KEY = 'x3_memory_v2';
+    function mLoad() {
+        try { return JSON.parse(localStorage.getItem(MEM_KEY)) || { ctx: {}, projects: [] }; }
+        catch { return { ctx: {}, projects: [] }; }
+    }
+    function mSave(m) {
+        try { localStorage.setItem(MEM_KEY, JSON.stringify(m)); } catch {}
+    }
+
+    /* ── SIDEBAR RENDER ── */
+    function renderSidebar(m) {
+        const inner = $('sidebar-inner');
+        let html = '';
+        const ctx = m.ctx || {};
+        const projects = m.projects || [];
+        if (Object.keys(ctx).length > 0) {
+            html += '<div class="sidebar-section">Memoria</div>';
+            for (const [k, v] of Object.entries(ctx)) {
+                html += `<div class="mem-item"><div class="mem-key">${k}</div><div class="mem-val">${v}</div></div>`;
+            }
+        }
+        if (projects.length > 0) {
+            html += '<div class="sidebar-section">Proyectos</div>';
+            for (const p of projects) {
+                html += `<div class="proj-item"><div class="proj-name">▸ ${p.name}</div><div class="proj-desc">${p.desc || ''}</div></div>`;
+            }
+        }
+        if (!html) html = '<div style="color:var(--text2);font-size:0.75rem;padding:8px 0;">Sin datos aún.</div>';
+        inner.innerHTML = html;
+    }
+
+    /* ── MESSAGES ── */
+    function addMsg(type, text) {
+        const div = document.createElement('div');
+        div.className = `msg ${type}`;
+        if (type === 'user') {
+            div.innerHTML = `<div class="msg-label">TÚ</div>${escHtml(text)}`;
+        } else if (type === 'x3') {
+            div.innerHTML = `<div class="msg-label">X3</div>${escHtml(text)}`;
+        } else {
+            div.textContent = text;
+        }
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
+        return div;
+    }
+    function addSys(text) { addMsg('sys', text); }
+    function escHtml(t) {
+        return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    }
+    function addTyping() {
+        const div = document.createElement('div');
+        div.className = 'msg x3 typing';
+        div.innerHTML = '<span></span><span></span><span></span>';
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
+        return div;
+    }
+
+    /* ── MEMORY COMMANDS ── */
+    function handleMemoryCommand(input, m) {
+        const lower = input.toLowerCase();
+
+        // Guardar en memoria
+        const remMatch = input.match(/recuerda(?:\s+que)?\s+(.+)/i);
+        if (remMatch) {
+            const data = remMatch[1].trim();
+            const keyMatch = data.match(/^(?:mi\s+)?(\w[\w\s]{0,20}?)\s+es\s+(.+)$/i) ||
+                             data.match(/^(?:soy|me\s+llamo|mi\s+nombre\s+es)\s+(.+)$/i);
+            if (keyMatch) {
+                if (keyMatch[2]) {
+                    m.ctx[keyMatch[1].trim()] = keyMatch[2].trim();
+                } else {
+                    m.ctx['nombre'] = keyMatch[1].trim();
+                }
+            } else {
+                const ts = new Date().toLocaleDateString('es-CL');
+                m.ctx[`nota_${ts}_${Object.keys(m.ctx).length}`] = data;
+            }
+            mSave(m);
+            renderSidebar(m);
+            return `Guardado en memoria: "${data}"`;
+        }
+
+        // Crear proyecto
+        const projMatch = input.match(/crea(?:\s+el)?\s+proyecto\s+(.+)/i);
+        if (projMatch) {
+            const name = projMatch[1].trim();
+            if (!m.projects) m.projects = [];
+            m.projects.push({ name, desc: 'Proyecto activo', created: new Date().toISOString() });
+            mSave(m);
+            renderSidebar(m);
+            return `Proyecto "${name}" creado y registrado en memoria.`;
+        }
+
+        // Consultar memoria
+        if (lower.includes('qué recuerdas') || lower.includes('que recuerdas') || lower.includes('qué sabes de mí') || lower.includes('que sabes de mi')) {
+            const ctx = m.ctx || {};
+            const projs = m.projects || [];
+            if (Object.keys(ctx).length === 0 && projs.length === 0) {
+                return 'No tengo datos guardados sobre ti aún. Puedes decirme "Recuerda que..." para guardar información.';
+            }
+            let resp = 'Esto es lo que tengo registrado:\n\n';
+            for (const [k, v] of Object.entries(ctx)) {
+                resp += `• ${k}: ${v}\n`;
+            }
+            if (projs.length > 0) {
+                resp += '\nProyectos activos:\n';
+                for (const p of projs) resp += `• ${p.name}\n`;
+            }
+            return resp.trim();
+        }
+
+        return null;
+    }
+
+    /* ── GEMINI API ── */
+    async function callGemini(userInput, m) {
+        // Construir contexto de memoria
+        const ctx = m.ctx || {};
+        const projs = m.projects || [];
+        let memCtx = '';
+        if (Object.keys(ctx).length > 0) {
+            memCtx += 'Datos del usuario en memoria:\n';
+            for (const [k, v] of Object.entries(ctx)) memCtx += `- ${k}: ${v}\n`;
+        }
+        if (projs.length > 0) {
+            memCtx += 'Proyectos activos:\n';
+            for (const p of projs) memCtx += `- ${p.name}: ${p.desc}\n`;
+        }
+
+        // Historial de conversación (últimos 10 turnos)
+        const history = conversationHistory.slice(-10).map(h => ({
+            role: h.role,
+            parts: [{ text: h.text }]
+        }));
+
+        const systemText = SYSTEM_PROMPT + (memCtx ? '\n\n' + memCtx : '');
+
+        const body = {
+            system_instruction: { parts: [{ text: systemText }] },
+            contents: [
+                ...history,
+                { role: 'user', parts: [{ text: userInput }] }
+            ],
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 1024,
+                topP: 0.9
+            }
+        };
+
+        const res = await fetch(GEMINI_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err?.error?.message || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        return data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta del modelo.';
+    }
+
+    /* ── PROCESS INPUT ── */
+    async function processInput(input) {
+        if (!input.trim() || S === 'thinking') return;
+
+        addMsg('user', input);
+        setState('thinking', 'Procesando...');
+
+        const m = mLoad();
+
+        // Verificar comandos de memoria locales primero
+        const localReply = handleMemoryCommand(input, m);
+        if (localReply) {
+            addMsg('x3', localReply);
+            conversationHistory.push({ role: 'user', text: input });
+            conversationHistory.push({ role: 'model', text: localReply });
+            setState('speaking', 'Sintetizando voz...');
+            await speak(localReply);
+            setState('idle', 'Sistema en línea. Listo para recibir comandos.');
+            return;
+        }
+
+        const typ = addTyping();
+        try {
+            const reply = await callGemini(input, m);
+            typ.remove();
+            addMsg('x3', reply);
+            conversationHistory.push({ role: 'user', text: input });
+            conversationHistory.push({ role: 'model', text: reply });
+            setState('speaking', 'Sintetizando voz...');
+            await speak(reply);
+        } catch (err) {
+            typ.remove();
+            addMsg('error', `Error: ${err.message}`);
+            console.error('[X3]', err);
+        } finally {
+            setState('idle', 'Sistema en línea. Listo para recibir comandos.');
+        }
+    }
+
+    /* ── TTS ── */
+    const TTS = 'speechSynthesis' in window ? speechSynthesis : null;
+    let ttsOK = false, bestVoice = null;
+
+    function loadVoices() {
+        if (!TTS) return;
+        const vv = TTS.getVoices();
+        if (!vv.length) return;
+        ttsOK = true;
+        bestVoice = vv.find(v => v.lang === 'es-CL' && v.localService) ||
+                    vv.find(v => v.lang.startsWith('es') && v.localService) ||
+                    vv.find(v => v.lang.startsWith('es-')) ||
+                    vv.find(v => v.lang.startsWith('es')) || null;
+        const el = $('stat-tts');
+        el.textContent = ttsOK ? 'SÍ' : 'NO';
+        el.className = 'stat-num ' + (ttsOK ? 'ok' : 'err');
+    }
+    if (TTS) {
+        if ('onvoiceschanged' in TTS) TTS.onvoiceschanged = loadVoices;
+        loadVoices();
+    }
+
+    function splitTTS(text, maxWords = 160) {
+        const sents = text.split(/(?<=[.!?:])\s+/);
+        const chunks = [];
+        let cur = '';
+        sents.forEach(s => {
+            const wc = (cur + ' ' + s).trim().split(/\s+/).length;
+            if (wc > maxWords && cur) { chunks.push(cur.trim()); cur = s; }
+            else { cur = cur ? cur + ' ' + s : s; }
+        });
+        if (cur.trim()) chunks.push(cur.trim());
+        return chunks.length ? chunks : [text];
+    }
+
+    function speak(text) {
+        return new Promise(res => {
+            if (!TTS || !ttsOK) { res(); return; }
+            try { TTS.cancel(); } catch {}
+            const clean = text.replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+                              .replace(/[◎●◌▶◆▸•\/\\]/g, '')
+                              .replace(/\s{2,}/g, ' ').trim();
+            if (!clean || clean.length < 2) { res(); return; }
+            const chunks = splitTTS(clean);
+            let i = 0, done = false;
+            const guard = setTimeout(() => { if (!done) { done = true; res(); } }, Math.max(chunks.length * 13000, 8000));
+            function next() {
+                if (i >= chunks.length) {
+                    if (!done) { done = true; clearTimeout(guard); res(); }
+                    return;
+                }
+                try {
+                    const u = new SpeechSynthesisUtterance(chunks[i++]);
+                    u.lang = 'es-CL'; u.rate = 0.91; u.pitch = 0.84; u.volume = 1;
+                    if (bestVoice) u.voice = bestVoice;
+                    u.onend = next;
+                    u.onerror = e => { if (e.error !== 'interrupted') console.warn('[TTS]', e.error); next(); };
+                    TTS.speak(u);
+                } catch { if (!done) { done = true; clearTimeout(guard); res(); } }
+            }
+            next();
+        });
+    }
+
+    /* ── STT ── */
+    const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let sr = null;
+    if (SRClass) {
+        sr = new SRClass();
+        sr.lang = 'es-CL';
+        sr.continuous = false;
+        sr.interimResults = false;
+        sr.maxAlternatives = 1;
+        sr.onstart = () => { srBusy = true; setState('listening', 'Escuchando... Hable ahora.'); };
+        sr.onresult = async e => {
+            const t = (e.results[0]?.[0]?.transcript || '').trim();
+            if (t) await processInput(t);
+        };
+        sr.onerror = e => {
+            srBusy = false;
+            if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+                setState('idle', 'Permiso de micrófono denegado.');
+                addSys('— Active el permiso de micrófono en ajustes del navegador. —');
+            } else if (e.error === 'no-speech') {
+                setState('idle', 'Sin voz detectada. Intente de nuevo.');
+            } else if (e.error !== 'aborted') {
+                setState('idle', `Error de micrófono: ${e.error}`);
+            }
+        };
+        sr.onend = () => { srBusy = false; if (S === 'listening') setState('idle', 'Sin entrada de voz.'); };
+        const el = $('stat-sr');
+        el.textContent = 'SÍ';
+        el.className = 'stat-num ok';
+    } else {
+        const el = $('stat-sr');
+        el.textContent = 'NO';
+        el.className = 'stat-num err';
+    }
+
+    micBtn.addEventListener('click', () => {
+        if (S === 'thinking') return;
+        if (!sr) { addSys('— Reconocimiento de voz no disponible. Use Chrome o Edge. —'); return; }
+        if (S === 'listening') {
+            try { sr.stop(); } catch {}
+            setState('idle', 'Escucha cancelada.');
+        } else {
+            if (srBusy) return;
+            try { sr.start(); } catch (e) {
+                srBusy = false;
+                if (e.name === 'InvalidStateError') {
+                    try { sr.stop(); } catch {}
+                    setTimeout(() => { try { sr.start(); } catch {} }, 350);
+                }
+            }
+        }
+    });
+
+    /* ── TEXT INPUT ── */
+    function submitText() {
+        const v = txtIn.value.trim();
+        if (!v || S === 'thinking') return;
+        txtIn.value = '';
+        txtIn.focus();
+        processInput(v);
+    }
+    txtIn.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitText(); }
+    });
+    txtIn.addEventListener('input', () => {
+        txtIn.style.height = 'auto';
+        txtIn.style.height = Math.min(txtIn.scrollHeight, 120) + 'px';
+    });
+
+    /* ── HELP & EXPORT ── */
+    function showHelp() {
+        addMsg('x3', 'Guía rápida de X3:\n\n• Pregunte cualquier cosa.\n• Guarde datos — "Recuerda que soy médico".\n• Cree proyectos — "Crea el proyecto Atlas".\n• Consulte memoria — "¿Qué recuerdas de mí?".\n• 🎙 → activar micrófono (Chrome/Edge).\n• Campo de texto → cualquier navegador.\n• Motor: Gemini 2.0 Flash ✓');
+    }
+
+    function exportMemory() {
+        const m = mLoad();
+        const blob = new Blob([JSON.stringify({ exportDate: new Date().toISOString(), ...m }, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `x3_memoria_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    }
+
+    /* ── BOOT ── */
+    async function boot() {
+        const seq = [
+            [380, 'Inicializando núcleo X3...'],
+            [340, 'Conectando con Gemini 2.0 Flash...'],
+            [300, 'Cargando bóveda de memoria...'],
+            [260, 'Calibrando motor de voz...'],
+            [220, 'Verificando sistemas...'],
+        ];
+        for (const [ms, msg] of seq) {
+            setState('thinking', msg);
+            await new Promise(r => setTimeout(r, ms));
+        }
+        const m = mLoad();
+        renderSidebar(m);
+        setState('idle', 'Sistema en línea. Listo para recibir comandos.');
+        const nc = Object.keys(m.ctx || {}).length;
+        const np = (m.projects || []).length;
+        let greet;
+        if (nc > 0 || np > 0) {
+            const parts = [];
+            if (nc > 0) parts.push(`${nc} entrada${nc!==1?'s':''} en memoria`);
+            if (np > 0) parts.push(`${np} proyecto${np!==1?'s':''} activo${np!==1?'s':''}`);
+            greet = `Sistemas en línea. Tengo ${parts.join(' y ')}. Motor Gemini operativo. A sus órdenes.`;
+        } else {
+            greet = `Sistemas en línea. Motor Gemini 2.0 Flash operativo. Primera sesión detectada. Bienvenido. Puede hablar o escribir.`;
+        }
+        addMsg('x3', greet);
+        await speak(greet);
+    }
+
+    boot().catch(e => {
+        console.error('[X3 Boot]', e);
+        setState('idle', 'Sistema iniciado con advertencias.');
+    });
+
+    /* ── CLEANUP ── */
+    window.addEventListener('beforeunload', () => {
+        clearInterval(clockInterval);
+        if (sr && srBusy) { try { sr.abort(); } catch {} }
+        if (TTS) { try { TTS.cancel(); } catch {} }
+    });
 </script>
-
-</body>    
-</htm
+</body>
+</html>
