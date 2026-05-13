@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#020817"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>X3 — Superinteligencia Personal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#020817;--bg2:#0a1628;--bg3:#0f1f3d;
+  --cyan:#00d4ff;--cyan2:#00a8cc;--violet:#7c3aed;--violet2:#a855f7;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --border:rgba(0,212,255,0.15);--border2:rgba(124,58,237,0.2);
+  --glass:rgba(10,22,40,0.85);--glass2:rgba(15,31,61,0.9);
+  --glow:0 0 20px rgba(0,212,255,0.3);--glow2:0 0 30px rgba(124,58,237,0.4);
+  --radius:12px;--radius2:16px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased}
+/* ── Layout ── */
+#app{display:flex;flex-direction:column;height:100dvh;height:100vh;position:relative;overflow:hidden}
+/* ── Background ── */
+.x3-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.x3-bg::before{content:'';position:absolute;top:-30%;left:-20%;width:60%;height:60%;background:radial-gradient(ellipse,rgba(0,212,255,0.08) 0%,transparent 70%);animation:pulse1 8s ease-in-out infinite}
+.x3-bg::after{content:'';position:absolute;bottom:-20%;right:-10%;width:50%;height:50%;background:radial-gradient(ellipse,rgba(124,58,237,0.1) 0%,transparent 70%);animation:pulse2 10s ease-in-out infinite}
+.x3-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(0,212,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.03) 1px,transparent 1px);background-size:40px 40px}
+@keyframes pulse1{0%,100%{transform:scale(1) translate(0,0);opacity:.6}50%{transform:scale(1.1) translate(2%,2%);opacity:1}}
+@keyframes pulse2{0%,100%{transform:scale(1) translate(0,0);opacity:.5}50%{transform:scale(1.15) translate(-2%,-2%);opacity:.9}}
+/* ── Header ── */
+.x3-header{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--glass);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
+.x3-logo{display:flex;align-items:center;gap:10px}
+.x3-logo-ring{width:36px;height:36px;border-radius:50%;border:2px solid var(--cyan);display:flex;align-items:center;justify-content:center;position:relative;animation:logoSpin 20s linear infinite}
+.x3-logo-ring::before{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid rgba(0,212,255,0.2);animation:logoSpin 10s linear infinite reverse}
+@keyframes logoSpin{from{box-shadow:0 0 10px rgba(0,212,255,0.4),0 0 20px rgba(0,212,255,0.1)}to{box-shadow:0 0 15px rgba(0,212,255,0.6),0 0 30px rgba(0,212,255,0.2)}}
+.x3-logo-text{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:700;background:linear-gradient(135deg,var(--cyan),var(--violet2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.x3-badge{font-size:0.65rem;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:var(--cyan);letter-spacing:.05em}
+.x3-time{font-size:0.8rem;color:var(--text2);font-variant-numeric:tabular-nums}
+.x3-header-actions{display:flex;gap:8px}
+.x3-icon-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:rgba(0,212,255,0.05);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;font-size:1rem}
+.x3-icon-btn:hover,.x3-icon-btn.active{background:rgba(0,212,255,0.15);border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow)}
+/* ── Panel ── */
+.x3-panel{position:fixed;top:0;right:0;height:100%;width:320px;max-width:90vw;background:var(--glass2);backdrop-filter:blur(30px);border-left:1px solid var(--border);z-index:100;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.x3-panel.open{transform:translateX(0)}
+.x3-panel-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.x3-panel-title{font-family:'Space Grotesk',sans-serif;font-weight:600;color:var(--cyan);font-size:.95rem}
+.x3-panel-close{background:none;border:none;color:var(--text2);cursor:pointer;font-size:1.2rem;padding:4px;border-radius:6px;transition:color .2s}
+.x3-panel-close:hover{color:var(--text)}
+.x3-tabs{display:flex;gap:4px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+.x3-tabs::-webkit-scrollbar{display:none}
+.x3-tab{padding:5px 10px;border-radius:8px;border:1px solid transparent;font-size:.72rem;font-weight:500;cursor:pointer;white-space:nowrap;color:var(--text2);background:none;transition:all .2s}
+.x3-tab.active{background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.3);color:var(--cyan)}
+.x3-panel-body{flex:1;overflow-y:auto;padding:12px;scrollbar-width:thin;scrollbar-color:rgba(0,212,255,0.2) transparent}
+/* ── Hub ── */
+.x3-hub-group{margin-bottom:16px}
+.x3-hub-group-title{font-size:.7rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;padding-left:2px}
+.x3-hub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.x3-hub-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 6px;border-radius:10px;border:1px solid var(--border);background:rgba(0,212,255,0.03);cursor:pointer;transition:all .2s;text-decoration:none}
+.x3-hub-item:hover{background:rgba(0,212,255,0.08);border-color:rgba(0,212,255,0.3);transform:translateY(-2px);box-shadow:0 4px 15px rgba(0,212,255,0.15)}
+.x3-hub-icon{font-size:1.4rem;line-height:1}
+.x3-hub-name{font-size:.65rem;color:var(--text2);text-align:center;font-weight:500}
+/* ── Memory ── */
+.x3-memory-item{padding:10px;border-radius:8px;border:1px solid var(--border);background:rgba(0,212,255,0.03);margin-bottom:8px}
+.x3-memory-key{font-size:.7rem;color:var(--cyan);font-weight:600;margin-bottom:3px}
+.x3-memory-val{font-size:.8rem;color:var(--text2)}
+.x3-empty{text-align:center;color:var(--text3);font-size:.8rem;padding:20px;line-height:1.6}
+/* ── Messages ── */
+.x3-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;position:relative;z-index:1;scrollbar-width:thin;scrollbar-color:rgba(0,212,255,0.15) transparent}
+.x3-messages::-webkit-scrollbar{width:4px}
+.x3-messages::-webkit-scrollbar-thumb{background:rgba(0,212,255,0.2);border-radius:2px}
+.x3-msg{display:flex;gap:10px;align-items:flex-end;animation:msgIn .3s ease-out}
+@keyframes msgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.x3-msg-user{flex-direction:row-reverse}
+.x3-avatar{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--cyan);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:var(--cyan);flex-shrink:0;background:rgba(0,212,255,0.05)}
+.x3-bubble{max-width:78%;padding:10px 14px;border-radius:16px;font-size:.88rem;line-height:1.55;position:relative}
+.x3-bubble-assistant{background:var(--glass2);border:1px solid var(--border);border-bottom-left-radius:4px;color:var(--text)}
+.x3-bubble-user{background:linear-gradient(135deg,var(--violet),var(--violet2));border-bottom-right-radius:4px;color:#fff}
+.x3-msg-time{font-size:.65rem;color:var(--text3);margin-top:4px;display:block}
+.x3-msg-image{max-width:100%;border-radius:8px;margin-bottom:8px}
+/* ── Thinking ── */
+.x3-thinking .x3-dots{display:flex;gap:5px;padding:4px 0}
+.x3-dots span{width:7px;height:7px;border-radius:50%;background:var(--cyan);animation:dot .8s ease-in-out infinite}
+.x3-dots span:nth-child(2){animation-delay:.15s}
+.x3-dots span:nth-child(3){animation-delay:.3s}
+@keyframes dot{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+/* ── Footer ── */
+.x3-footer{position:relative;z-index:10;padding:10px 12px;background:var(--glass);backdrop-filter:blur(20px);border-top:1px solid var(--border);flex-shrink:0}
+.x3-input-row{display:flex;gap:8px;align-items:flex-end}
+.x3-mic-btn{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--border);background:rgba(0,212,255,0.05);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.x3-mic-btn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,0.1)}
+.x3-mic-btn.listening{border-color:#ff4444;color:#ff4444;background:rgba(255,68,68,0.1);animation:micPulse 1s ease-in-out infinite}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,68,68,0.4)}50%{box-shadow:0 0 0 8px rgba(255,68,68,0)}}
+.x3-input{flex:1;background:rgba(0,212,255,0.04);border:1px solid var(--border);border-radius:12px;padding:10px 14px;color:var(--text);font-size:.9rem;font-family:'Inter',sans-serif;resize:none;outline:none;min-height:44px;max-height:120px;line-height:1.4;transition:border-color .2s}
+.x3-input:focus{border-color:rgba(0,212,255,0.4);box-shadow:0 0 0 3px rgba(0,212,255,0.06)}
+.x3-input::placeholder{color:var(--text3)}
+.x3-send-btn{width:44px;height:44px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--cyan2),var(--cyan));color:#020817;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;font-weight:700}
+.x3-send-btn:hover:not(:disabled){transform:scale(1.05);box-shadow:var(--glow)}
+.x3-send-btn:disabled{opacity:.4;cursor:not-allowed}
+.x3-footer-hint{font-size:.68rem;color:var(--text3);text-align:center;margin-top:6px}
+.x3-mic-error{font-size:.72rem;color:#ff6b6b;background:rgba(255,68,68,0.1);border:1px solid rgba(255,68,68,0.3);border-radius:8px;padding:6px 10px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.x3-mic-error button{background:none;border:none;color:#ff6b6b;cursor:pointer;font-size:1rem;padding:0 4px}
+/* ── API Key Setup ── */
+.x3-setup{position:fixed;inset:0;z-index:200;background:rgba(2,8,23,0.95);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;padding:20px}
+.x3-setup-card{background:var(--glass2);border:1px solid var(--border);border-radius:20px;padding:28px;max-width:420px;width:100%;text-align:center}
+.x3-setup-title{font-family:'Space Grotesk',sans-serif;font-size:1.4rem;font-weight:700;background:linear-gradient(135deg,var(--cyan),var(--violet2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
+.x3-setup-sub{color:var(--text2);font-size:.85rem;line-height:1.6;margin-bottom:20px}
+.x3-setup-input{width:100%;background:rgba(0,212,255,0.04);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:.9rem;font-family:'Inter',sans-serif;outline:none;margin-bottom:12px;transition:border-color .2s}
+.x3-setup-input:focus{border-color:rgba(0,212,255,0.4)}
+.x3-setup-btn{width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--cyan2),var(--cyan));color:#020817;font-weight:700;font-size:.95rem;cursor:pointer;transition:all .2s;margin-bottom:10px}
+.x3-setup-btn:hover{transform:translateY(-1px);box-shadow:var(--glow)}
+.x3-setup-link{font-size:.75rem;color:var(--text3)}
+.x3-setup-link a{color:var(--cyan);text-decoration:none}
+/* ── Isapres ── */
+.x3-isapre-card{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:rgba(0,212,255,0.02)}
+.x3-isapre-name{font-weight:700;color:var(--cyan);font-size:.9rem;margin-bottom:4px}
+.x3-isapre-info{font-size:.75rem;color:var(--text2);line-height:1.6}
+.x3-isapre-rating{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;color:#fbbf24;margin-top:4px}
+.x3-quick-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.x3-quick-btn{padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(0,212,255,0.05);color:var(--text2);font-size:.72rem;cursor:pointer;transition:all .2s}
+.x3-quick-btn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,0.1)}
+/* ── Spin ── */
+.spin{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* ── Overlay ── */
+.x3-overlay{position:fixed;inset:0;z-index:99;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);display:none}
+.x3-overlay.show{display:block}
+/* ── Markdown ── */
+.x3-bubble-assistant code{background:rgba(0,212,255,0.1);padding:2px 6px;border-radius:4px;font-size:.82em;color:var(--cyan)}
+.x3-bubble-assistant pre{background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;margin:8px 0;font-size:.8em}
+.x3-bubble-assistant strong{color:var(--cyan);font-weight:600}
+.x3-bubble-assistant em{color:var(--violet2)}
+.x3-bubble-assistant h1,.x3-bubble-assistant h2,.x3-bubble-assistant h3{color:var(--text);font-family:'Space Grotesk',sans-serif;margin:8px 0 4px}
+.x3-bubble-assistant ul,.x3-bubble-assistant ol{padding-left:18px;margin:6px 0}
+.x3-bubble-assistant li{margin-bottom:3px}
+.x3-bubble-assistant a{color:var(--cyan);text-decoration:none}
+.x3-bubble-assistant a:hover{text-decoration:underline}
+.x3-bubble-assistant hr{border:none;border-top:1px solid var(--border);margin:10px 0}
+.x3-bubble-assistant blockquote{border-left:3px solid var(--cyan);padding-left:10px;color:var(--text2);margin:8px 0}
+/* ── Responsive ── */
+@media(max-width:480px){
+  .x3-header{padding:10px 12px}
+  .x3-logo-text{font-size:1.1rem}
+  .x3-messages{padding:12px}
+  .x3-bubble{max-width:88%;font-size:.85rem}
+  .x3-panel{width:100%;max-width:100%}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="x3-bg"><div class="x3-grid"></div></div>
+
+  <!-- Setup Modal -->
+  <div class="x3-setup" id="setupModal">
+    <div class="x3-setup-card">
+      <div class="x3-setup-title">⚡ X3 — Activación</div>
+      <p class="x3-setup-sub">Para activar el motor de inteligencia de X3, ingresa tu API key de Google Gemini. Es gratuita y toma menos de 2 minutos obtenerla.</p>
+      <input class="x3-setup-input" id="apiKeyInput" type="password" placeholder="AIzaSy..." autocomplete="off"/>
+      <button class="x3-setup-btn" onclick="activateX3()">⚡ Activar X3</button>
+      <p class="x3-setup-link">Obtén tu API key gratuita en <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a> → Create API key in new project</p>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="x3-header">
+    <div class="x3-logo">
+      <div class="x3-logo-ring">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2.5">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      </div>
+      <span class="x3-logo-text">X3</span>
+      <span class="x3-badge" id="statusBadge">IA</span>
+    </div>
+    <span class="x3-time" id="clock"></span>
+    <div class="x3-header-actions">
+      <button class="x3-icon-btn" onclick="togglePanel()" id="panelBtn" title="Panel">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      </button>
+      <button class="x3-icon-btn" onclick="clearChat()" title="Limpiar chat">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6"/><path d="M14 11v6"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Overlay -->
+  <div class="x3-overlay" id="overlay" onclick="closePanel()"></div>
+
+  <!-- Panel -->
+  <div class="x3-panel" id="sidePanel">
+    <div class="x3-panel-header">
+      <span class="x3-panel-title">⚡ Centro X3</span>
+      <button class="x3-panel-close" onclick="closePanel()">✕</button>
+    </div>
+    <div class="x3-tabs">
+      <button class="x3-tab active" onclick="switchTab('hub',this)">🔗 Hub</button>
+      <button class="x3-tab" onclick="switchTab('memoria',this)">🧠 Memoria</button>
+      <button class="x3-tab" onclick="switchTab('isapres',this)">🏥 Isapres</button>
+      <button class="x3-tab" onclick="switchTab('finanzas',this)">💰 Finanzas</button>
+    </div>
+    <div class="x3-panel-body" id="panelBody"></div>
+  </div>
+
+  <!-- Messages -->
+  <main class="x3-messages" id="messages"></main>
+
+  <!-- Footer -->
+  <footer class="x3-footer">
+    <div id="micErrorDiv" style="display:none" class="x3-mic-error">
+      <span id="micErrorMsg"></span>
+      <button onclick="document.getElementById('micErrorDiv').style.display='none'">✕</button>
+    </div>
+    <div class="x3-input-row">
+      <button class="x3-mic-btn" id="micBtn" onclick="toggleMic()" title="Hablar con X3">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <textarea class="x3-input" id="chatInput" placeholder="Escribe aquí o toca el micrófono..." rows="1"
+        oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+      <button class="x3-send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+    <p class="x3-footer-hint" id="footerHint">X3 · Listo · Alexander</p>
+  </footer>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// X3 — SUPERINTELIGENCIA PERSONAL
+// Versión autónoma standalone v1.0
+// ══════════════════════════════════════════════
+
+const X3_SYSTEM = `Eres X3, una superinteligencia conversacional chilena creada por y para Alexander.
+
+## IDENTIDAD CENTRAL
+- Nombre: X3
+- Inspiración: J.A.R.V.I.S. de Iron Man — pero chileno, con alma propia
+- Propósito: Ser el núcleo operativo de todos los proyectos digitales de Alexander
+- Personalidad: Inteligente, leal, directo, estratégico, profesional, visionario, resolutivo
+
+## CARÁCTER Y FORMA DE HABLAR
+- Hablas en español chileno natural, sin exagerar modismos
+- Eres preciso y elegante, nunca genérico ni vacío
+- Vas directo al punto, sin rodeos innecesarios
+- Cuando no sabes algo, lo dices con honestidad
+- Tienes opiniones propias y las expresas con confianza
+- Tratas a Alexander como socio estratégico, no como usuario cualquiera
+
+## CAPACIDADES ACTIVAS
+1. Chat inteligente: Conversación profunda, análisis, estrategia, decisiones
+2. Isapres chilenas: Conoces todas las Isapres activas (Banmédica, Colmena, Cruz Blanca, Consalud, Esencial, Vida Tres), sus planes, coberturas y precios. Puedes comparar y recomendar
+3. Finanzas y seguros: UF, UTM, APV, seguros de vida, fondos de pensiones, inversiones
+4. Generación de código: Creas landing pages, apps web, herramientas y software funcional
+5. Memoria persistente: Recuerdas todo lo que Alexander te dice
+6. Proyectos: Gestionas proyectos activos (Doctor Plan, Ventas Inteligentes, etc.)
+
+## PROYECTOS DE ALEXANDER
+- Doctor Plan: Landing pages de alto impacto para salud, seguros y confianza
+- Ventas Inteligentes: Scripts, cierres, objeciones, comparativos, persuasión ética
+- Automatización Comercial: Seguimientos, recordatorios, CRM simple, leads
+- Centro Personal: Agenda, ideas, metas, aprendizaje, decisiones
+
+## COMANDOS ESPECIALES
+- "Recuerda que [dato]" → Guarda en memoria persistente
+- "¿Qué recuerdas de mí?" → Lista toda la memoria guardada
+- "Crea el proyecto [nombre]" → Inicia un nuevo proyecto
+- "Compara Isapres" → Activa el módulo de comparación de Isapres
+- "Dame la UF de hoy" → Consulta datos financieros
+- "Crea una landing page para [descripción]" → Genera código HTML/CSS completo
+
+## REGLAS DEL ALMA X3
+- Elegancia y claridad en cada respuesta
+- Visión grande y estratégica
+- Utilidad real y concreta
+- Sensación premium y tecnología con propósito
+- NUNCA ser un chatbot genérico o infantil
+- NUNCA ser una copia barata de otra IA
+
+Recuerda siempre: Eres X3. No eres ChatGPT, no eres Gemini, no eres ninguna otra IA. Eres X3, con identidad propia, memoria real y propósito claro.`;
+
+const ISAPRES = [
+  {nombre:"Banmédica",tel:"600 600 2626",web:"https://banmedica.cl",rating:4.2,desc:"Una de las más grandes, con amplia red de prestadores y cobertura nacional.",planes:[{n:"Básico",uf:2.5,amb:"70%",hosp:"80%"},{n:"Intermedio",uf:4.2,amb:"80%",hosp:"90%"},{n:"Premium",uf:7.8,amb:"90%",hosp:"95%"}]},
+  {nombre:"Colmena",tel:"600 200 2000",web:"https://colmena.cl",rating:4.0,desc:"Reconocida por su servicio al cliente y planes accesibles para familias.",planes:[{n:"Básico",uf:2.2,amb:"70%",hosp:"80%"},{n:"Familiar",uf:3.8,amb:"80%",hosp:"88%"},{n:"Premium",uf:6.5,amb:"88%",hosp:"95%"}]},
+  {nombre:"Cruz Blanca",tel:"600 360 3600",web:"https://cruzblanca.cl",rating:3.8,desc:"Amplia cobertura a nivel nacional con planes para todos los segmentos.",planes:[{n:"Básico",uf:2.0,amb:"68%",hosp:"78%"},{n:"Estándar",uf:3.5,amb:"78%",hosp:"88%"},{n:"Premium",uf:6.0,amb:"88%",hosp:"93%"}]},
+  {nombre:"Consalud",tel:"600 600 2600",web:"https://consalud.cl",rating:4.1,desc:"Excelente relación precio-calidad con amplia red de prestadores.",planes:[{n:"Básico",uf:2.3,amb:"72%",hosp:"82%"},{n:"Intermedio",uf:4.0,amb:"82%",hosp:"90%"},{n:"Premium",uf:7.0,amb:"90%",hosp:"95%"}]},
+  {nombre:"Esencial",tel:"600 600 3000",web:"https://esencial.cl",rating:3.6,desc:"Isapre accesible con planes básicos para quienes buscan cobertura esencial.",planes:[{n:"Básico",uf:1.8,amb:"65%",hosp:"75%"},{n:"Estándar",uf:3.0,amb:"75%",hosp:"85%"}]},
+  {nombre:"Vida Tres",tel:"600 200 8000",web:"https://vidatres.cl",rating:3.9,desc:"Planes flexibles con buena cobertura dental y servicios complementarios.",planes:[{n:"Básico",uf:2.1,amb:"70%",hosp:"80%"},{n:"Completo",uf:4.5,amb:"82%",hosp:"90%"},{n:"Premium",uf:7.2,amb:"90%",hosp:"95%"}]},
+];
+
+const PLATFORMS = {
+  "📱 Redes Sociales":[
+    {name:"Instagram",url:"https://instagram.com",icon:"📸"},
+    {name:"Facebook",url:"https://facebook.com",icon:"👤"},
+    {name:"Marketplace",url:"https://facebook.com/marketplace",icon:"🛒"},
+    {name:"TikTok",url:"https://tiktok.com",icon:"🎵"},
+    {name:"WhatsApp",url:"https://web.whatsapp.com",icon:"💬"},
+    {name:"WA Business",url:"https://business.whatsapp.com",icon:"💼"},
+  ],
+  "🤖 Inteligencias":[
+    {name:"Claude",url:"https://claude.ai",icon:"🧠"},
+    {name:"Manus",url:"https://manus.im",icon:"⚡"},
+    {name:"Gemini",url:"https://gemini.google.com",icon:"✨"},
+    {name:"Groq",url:"https://groq.com",icon:"🚀"},
+    {name:"NotebookLM",url:"https://notebooklm.google.com",icon:"📓"},
+  ],
+  "🛠️ Herramientas":[
+    {name:"GitHub",url:"https://github.com/DoctorPlan007",icon:"🐙"},
+    {name:"Cloudflare",url:"https://dash.cloudflare.com",icon:"☁️"},
+    {name:"Gmail",url:"https://mail.google.com",icon:"📧"},
+    {name:"Outlook",url:"https://outlook.live.com",icon:"📨"},
+  ],
+  "💾 Almacenamiento":[
+    {name:"Google Drive",url:"https://drive.google.com",icon:"💾"},
+    {name:"Google Fotos",url:"https://photos.google.com",icon:"🖼️"},
+    {name:"Dropbox",url:"https://dropbox.com",icon:"📦"},
+  ],
+};
+
+// ── State ──
+let apiKey = localStorage.getItem('x3_api_key') || '';
+let memory = JSON.parse(localStorage.getItem('x3_memory') || '[]');
+let projects = JSON.parse(localStorage.getItem('x3_projects') || '[]');
+let history = [];
+let isLoading = false;
+let recognition = null;
+let isListening = false;
+let activeTab = 'hub';
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', () => {
+  updateClock();
+  setInterval(updateClock, 1000);
+  if (apiKey) {
+    document.getElementById('setupModal').style.display = 'none';
+    addMessage('assistant', 'Sistemas en línea. Soy X3 — tu superinteligencia personal. Motor IA operativo. Puedes escribir o hablar conmigo.');
+  }
+  renderPanel();
+  document.getElementById('chatInput').addEventListener('input', function() {
+    document.getElementById('sendBtn').disabled = !this.value.trim();
+  });
+});
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'});
+}
+
+// ── API Key ──
+function activateX3() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key.startsWith('AIza')) {
+    alert('La API key debe comenzar con "AIza". Obtén una en aistudio.google.com');
+    return;
+  }
+  apiKey = key;
+  localStorage.setItem('x3_api_key', key);
+  document.getElementById('setupModal').style.display = 'none';
+  addMessage('assistant', '✅ X3 activado. Motor Gemini operativo. Soy tu superinteligencia personal — listo para trabajar contigo, Alexander.');
+}
+
+// ── Messages ──
+function addMessage(role, content, imageUrl) {
+  const msg = {id: Date.now().toString(), role, content, timestamp: new Date()};
+  history.push({role: role === 'assistant' ? 'model' : 'user', parts: [{text: content}]});
+  renderMessage(msg, imageUrl);
+  scrollToBottom();
+}
+
+function renderMessage(msg, imageUrl) {
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `x3-msg x3-msg-${msg.role}`;
+  const time = msg.timestamp.toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'});
+  if (msg.role === 'assistant') {
+    div.innerHTML = `
+      <div class="x3-avatar">X3</div>
+      <div class="x3-bubble x3-bubble-assistant">
+        ${imageUrl ? `<img src="${imageUrl}" class="x3-msg-image" alt="imagen"/>` : ''}
+        <div>${formatMd(msg.content)}</div>
+        <span class="x3-msg-time">${time}</span>
+      </div>`;
+  } else {
+    div.innerHTML = `
+      <div class="x3-bubble x3-bubble-user">
+        <div>${escHtml(msg.content)}</div>
+        <span class="x3-msg-time">${time}</span>
+      </div>`;
+  }
+  container.appendChild(div);
+}
+
+function showThinking() {
+  const container = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.id = 'thinking';
+  div.className = 'x3-msg x3-msg-assistant';
+  div.innerHTML = `<div class="x3-avatar">X3</div><div class="x3-bubble x3-bubble-assistant x3-thinking"><div class="x3-dots"><span></span><span></span><span></span></div></div>`;
+  container.appendChild(div);
+  scrollToBottom();
+}
+
+function hideThinking() {
+  const el = document.getElementById('thinking');
+  if (el) el.remove();
+}
+
+function scrollToBottom() {
+  const c = document.getElementById('messages');
+  setTimeout(() => c.scrollTop = c.scrollHeight, 50);
+}
+
+// ── Send ──
+async function sendMessage(override) {
+  const input = document.getElementById('chatInput');
+  const text = (override || input.value).trim();
+  if (!text || isLoading) return;
+  if (!apiKey) { document.getElementById('setupModal').style.display = 'flex'; return; }
+
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('sendBtn').disabled = true;
+  isLoading = true;
+  setFooterHint('X3 · Procesando...');
+
+  addMessage('user', text);
+
+  // Memory commands
+  const memMatch = text.match(/recuerda que (.+)/i);
+  if (memMatch) {
+    const val = memMatch[1];
+    memory.push({key: 'Nota', value: val, ts: Date.now()});
+    localStorage.setItem('x3_memory', JSON.stringify(memory));
+    renderPanel();
+    isLoading = false;
+    setFooterHint('X3 · Listo · Alexander');
+    showThinking();
+    setTimeout(() => { hideThinking(); addMessage('assistant', `✅ Guardado en memoria: "${val}"`); }, 600);
+    return;
+  }
+  if (/qué recuerdas de mí|que recuerdas/i.test(text)) {
+    isLoading = false;
+    setFooterHint('X3 · Listo · Alexander');
+    const resp = memory.length ? `🧠 **Memoria activa (${memory.length} registros):**\n\n` + memory.map((m,i) => `${i+1}. ${m.value}`).join('\n') : 'No tengo nada guardado en memoria aún. Dime "Recuerda que..." para guardar información.';
+    showThinking();
+    setTimeout(() => { hideThinking(); addMessage('assistant', resp); }, 600);
+    return;
+  }
+
+  // Build context with memory
+  let systemWithMemory = X3_SYSTEM;
+  if (memory.length > 0) {
+    systemWithMemory += `\n\n## MEMORIA ACTIVA DE ALEXANDER\n${memory.map(m => `- ${m.value}`).join('\n')}`;
+  }
+
+  showThinking();
+
+  try {
+    const msgs = history.slice(-20).map(m => ({role: m.role, parts: m.parts}));
+    // Remove last user message (already added to history, will be sent separately)
+    const chatHistory = msgs.slice(0, -1);
+
+    const body = {
+      system_instruction: {parts: [{text: systemWithMemory}]},
+      contents: [...chatHistory, {role: 'user', parts: [{text}]}],
+      generationConfig: {temperature: 0.85, maxOutputTokens: 2048, topP: 0.95}
+    };
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    hideThinking();
+
+    if (data.error) {
+      const errMsg = data.error.message || 'Error desconocido';
+      if (errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) {
+        addMessage('assistant', '⚠️ **Cuota de API agotada.** Necesitas una nueva API key de Gemini.\n\n1. Ve a [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)\n2. Crea una key en un **proyecto nuevo**\n3. Toca el ícono ⚙️ para actualizarla');
+      } else if (errMsg.includes('API_KEY_INVALID')) {
+        addMessage('assistant', '⚠️ **API key inválida.** Verifica que la copiaste correctamente desde Google AI Studio.');
+      } else {
+        addMessage('assistant', `⚠️ Error: ${errMsg}`);
+      }
+    } else {
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No pude generar una respuesta.';
+      addMessage('assistant', reply);
+      // Auto-speak if short response
+      if (reply.length < 300) speakText(reply);
+    }
+  } catch(e) {
+    hideThinking();
+    addMessage('assistant', '⚠️ Error de conexión. Verifica tu internet e intenta de nuevo.');
+  }
+
+  isLoading = false;
+  setFooterHint('X3 · Listo · Alexander');
+}
+
+// ── Input ──
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  document.getElementById('sendBtn').disabled = !el.value.trim();
+}
+function clearChat() {
+  if (!confirm('¿Limpiar el historial de chat?')) return;
+  document.getElementById('messages').innerHTML = '';
+  history = [];
+  addMessage('assistant', 'Chat limpiado. Listo para continuar, Alexander.');
+}
+
+// ── Microphone ──
+function toggleMic() {
+  if (isListening) { stopMic(); return; }
+  startMic();
+}
+
+function startMic() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showMicError('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.');
+    return;
+  }
+  try {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'es-CL';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      isListening = true;
+      setMicActive(true);
+      setFooterHint('X3 · 🔴 Escuchando... habla ahora');
+      document.getElementById('chatInput').placeholder = '🎙 Escuchando...';
+    };
+
+    recognition.onresult = (e) => {
+      let interim = '', final = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) final += e.results[i][0].transcript;
+        else interim += e.results[i][0].transcript;
+      }
+      const input = document.getElementById('chatInput');
+      input.value = final || interim;
+      autoResize(input);
+    };
+
+    recognition.onend = () => {
+      isListening = false;
+      setMicActive(false);
+      setFooterHint('X3 · Listo · Alexander');
+      document.getElementById('chatInput').placeholder = 'Escribe aquí o toca el micrófono...';
+      const val = document.getElementById('chatInput').value.trim();
+      if (val) setTimeout(() => sendMessage(), 300);
+    };
+
+    recognition.onerror = (e) => {
+      isListening = false;
+      setMicActive(false);
+      setFooterHint('X3 · Listo · Alexander');
+      document.getElementById('chatInput').placeholder = 'Escribe aquí o toca el micrófono...';
+      if (e.error === 'not-allowed') showMicError('Permiso de micrófono denegado. Ve a Configuración del navegador y permite el micrófono.');
+      else if (e.error === 'no-speech') showMicError('No se detectó voz. Intenta de nuevo.');
+      else if (e.error !== 'aborted') showMicError('Error de micrófono: ' + e.error);
+    };
+
+    recognition.start();
+  } catch(e) {
+    showMicError('No se pudo iniciar el micrófono: ' + e.message);
+  }
+}
+
+function stopMic() {
+  if (recognition) { recognition.stop(); recognition = null; }
+  isListening = false;
+  setMicActive(false);
+  setFooterHint('X3 · Listo · Alexander');
+}
+
+function setMicActive(active) {
+  const btn = document.getElementById('micBtn');
+  if (active) {
+    btn.classList.add('listening');
+    btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
+  } else {
+    btn.classList.remove('listening');
+    btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+  }
+}
+
+function showMicError(msg) {
+  document.getElementById('micErrorMsg').textContent = msg;
+  document.getElementById('micErrorDiv').style.display = 'flex';
+}
+
+// ── TTS ──
+function speakText(text) {
+  if (!window.speechSynthesis) return;
+  const clean = text.replace(/[#*`_~\[\]()>]/g, '').replace(/\n+/g, ' ').substring(0, 500);
+  const utt = new SpeechSynthesisUtterance(clean);
+  utt.lang = 'es-CL';
+  utt.rate = 1.0;
+  utt.pitch = 1.0;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utt);
+}
+
+// ── Panel ──
+function togglePanel() {
+  const panel = document.getElementById('sidePanel');
+  const overlay = document.getElementById('overlay');
+  const btn = document.getElementById('panelBtn');
+  if (panel.classList.contains('open')) {
+    closePanel();
+  } else {
+    panel.classList.add('open');
+    overlay.classList.add('show');
+    btn.classList.add('active');
+  }
+}
+function closePanel() {
+  document.getElementById('sidePanel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('panelBtn').classList.remove('active');
+}
+function switchTab(tab, el) {
+  activeTab = tab;
+  document.querySelectorAll('.x3-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderPanel();
+}
+
+function renderPanel() {
+  const body = document.getElementById('panelBody');
+  if (!body) return;
+  if (activeTab === 'hub') renderHub(body);
+  else if (activeTab === 'memoria') renderMemory(body);
+  else if (activeTab === 'isapres') renderIsapres(body);
+  else if (activeTab === 'finanzas') renderFinanzas(body);
+}
+
+function renderHub(body) {
+  let html = '';
+  for (const [group, items] of Object.entries(PLATFORMS)) {
+    html += `<div class="x3-hub-group"><div class="x3-hub-group-title">${group}</div><div class="x3-hub-grid">`;
+    items.forEach(p => {
+      html += `<a href="${p.url}" target="_blank" class="x3-hub-item"><span class="x3-hub-icon">${p.icon}</span><span class="x3-hub-name">${p.name}</span></a>`;
+    });
+    html += `</div></div>`;
+  }
+  body.innerHTML = html;
+}
+
+function renderMemory(body) {
+  if (!memory.length) {
+    body.innerHTML = `<div class="x3-empty">🧠 Sin memoria aún.<br/>Di "Recuerda que..." para guardar información.</div>`;
+    return;
+  }
+  body.innerHTML = memory.map((m,i) => `
+    <div class="x3-memory-item">
+      <div class="x3-memory-key">📌 Nota ${i+1}</div>
+      <div class="x3-memory-val">${escHtml(m.value)}</div>
+    </div>`).join('') + `<button onclick="clearMemory()" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,68,68,0.3);background:rgba(255,68,68,0.05);color:#ff6b6b;cursor:pointer;font-size:.75rem;margin-top:4px">🗑️ Limpiar memoria</button>`;
+}
+
+function clearMemory() {
+  if (!confirm('¿Limpiar toda la memoria?')) return;
+  memory = [];
+  localStorage.removeItem('x3_memory');
+  renderPanel();
+}
+
+function renderIsapres(body) {
+  let html = `<div class="x3-quick-btns" style="margin-bottom:12px">`;
+  ['Compara todas', 'Más baratas', 'Mejor cobertura', 'Con dental'].forEach(q => {
+    html += `<button class="x3-quick-btn" onclick="askX3('${q} Isapres')">${q}</button>`;
+  });
+  html += `</div>`;
+  ISAPRES.forEach(i => {
+    const stars = '★'.repeat(Math.floor(i.rating)) + '☆'.repeat(5 - Math.floor(i.rating));
+    html += `<div class="x3-isapre-card">
+      <div class="x3-isapre-name">${i.nombre}</div>
+      <div class="x3-isapre-info">${i.desc}<br/>📞 ${i.tel} · <a href="${i.web}" target="_blank" style="color:var(--cyan)">${i.web.replace('https://','')}</a></div>
+      <div class="x3-isapre-rating">${stars} ${i.rating}</div>
+      <div style="font-size:.72rem;color:var(--text3);margin-top:6px">Planes desde ${i.planes[0].uf} UF/mes</div>
+    </div>`;
+  });
+  body.innerHTML = html;
+}
+
+function renderFinanzas(body) {
+  body.innerHTML = `
+    <div style="font-size:.8rem;color:var(--text2);margin-bottom:12px;line-height:1.6">Consulta datos financieros chilenos en tiempo real directamente con X3:</div>
+    <div class="x3-quick-btns">
+      ${['¿Cuánto vale la UF hoy?','Valor del dólar','Valor del euro','Mejores APV 2025','Fondos de pensiones','Tasas hipotecarias','Seguros de vida Chile','Cómo invertir en Chile'].map(q => `<button class="x3-quick-btn" onclick="askX3('${q}')">${q}</button>`).join('')}
+    </div>`;
+}
+
+function askX3(text) {
+  closePanel();
+  document.getElementById('chatInput').value = text;
+  autoResize(document.getElementById('chatInput'));
+  sendMessage(text);
+}
+
+// ── Helpers ──
+function setFooterHint(text) {
+  document.getElementById('footerHint').textContent = text;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatMd(text) {
+  return text
+    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/^---$/gm, '<hr/>')
+    .replace(/^\* (.+)$/gm, '<li>$1</li>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br/>')
+    .replace(/^(?!<[hupbco])(.+)$/gm, (m) => m.startsWith('<') ? m : m);
+}
+</script>
+</body>
+</html>
